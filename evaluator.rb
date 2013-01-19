@@ -58,11 +58,9 @@ class Evaluator
         result = []
         elems_no = operator_arg.count
         if elems_no > MAX_IN_ARRAY then
-            result += [
-                EvaluationResult.new(
+            result << EvaluationResult.new(
                 "$in operator with a large array (#{elems_no}) is inefficient",
                 EvaluationResult::CRITICAL)
-            ]
         end
         return result
     end
@@ -111,6 +109,37 @@ class Evaluator
         return res
     end
 
+    def handle_regex(namespace, field, operator_arg)
+        res = []
+        regex = eval operator_arg
+
+        if not regex.source.start_with? '^' then
+            res << EvaluationResult.new(
+                'Try to change the regex so that it has an anchor for the ' +
+                'beginning (i.e. ^). Otherwise the engine cannot make use of ' +
+                'indexes (if there are any).',
+                EvaluationResult::VERY_BAD)
+        end
+
+        if regex.casefold? then
+            res << EvaluationResult.new(
+                'Case insensitive queries are inefficient. Consider keeping ' +
+                "a lowercase copy of field '#{field}' in your documents.",
+                EvaluationResult::VERY_BAD)
+        end
+
+        ['.*', '.*$'].each do |bad_end|
+            if regex.source.end_with? bad_end then
+                res << EvaluationResult.new(
+                    "Do you really need #{bad_end} at the end of your regex? "+
+                    'It slows down the queries.',
+                    EvaluationResult::VERY_BAD)
+            end
+        end
+
+        return res
+    end
+
     def empty_handle(namespace, field, operator_arg)
         []
     end
@@ -146,7 +175,7 @@ class Evaluator
         "$type" => :empty_handle, #TODO
 
         # javascript
-        "$regex" =>  :empty_handle, #TODO
+        "$regex" =>  :handle_regex,
         "$where" => :handle_where,
 
         # geospatial
@@ -165,6 +194,19 @@ class Evaluator
     # @param field specifies the field in the collection
     def handle_single_field(namespace, field, operators_hash)
         res = []
+
+        # special case for regexes
+        if operators_hash.has_key? '$options' then
+            #assert that we have a 'regex' operator
+            if not operators_hash.has_key? '$regex' then
+                raise '$options operator provided, but $regex not present.'
+            end
+
+            regex = "/#{operators_hash['$regex']}/#{operators_hash['$options']}"
+            operators_hash.delete('$options')
+            operators_hash['$regex'] = regex
+        end
+
         operators_hash.each do |operator_str, val|
             method_symbol = OPERATOR_HANDLERS_DISPATCH[operator_str]
             if method_symbol.nil?
