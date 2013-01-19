@@ -68,48 +68,60 @@ class Evaluator
 
     def handle_negation (namespace, field, operator_arg)
         return [EvaluationResult.new(
-            'negation operator is inefficient',
+            'Negation operators ($ne, $nin) $ are inefficient.',
             EvaluationResult::CRITICAL
         )]
     end
 
     def handle_where (namespace, field, operator_arg)
         return [EvaluationResult.new(
-            'javascript is slow, you should redesign your queries',
+            'javascript is slow, you should redesign your queries.',
             EvaluationResult::CRITICAL
         )]
     end
 
-    #TODO
-    def handle_regexp(namespace, field, operator_arg)
-        return [
-            EvaluationResult.new(
-                'REGEX 1',
-                EvaluationResult::CRITICAL),
-            EvaluationResult.new(
-                'REGEX 2',
-                EvaluationResult::BAD),
-        ]
-    end
-
     def empty_handle(namespace, field, operator_arg)
-        return []
+        []
     end
 
     #TODO
     def check_for_indexes query_hash
+        []
     end
 
     OPERATOR_HANDLERS_DISPATCH = {
+        "$all" => :empty_handle, #TODO
+        "$gt" => :empty_handle, #TODO
+        "$gte" => :empty_handle, #TODO
         "$in" => :handle_in,
+        "$lt" => :empty_handle, #TODO
+        "$lte" => :empty_handle, #TODO
         "$ne" => :handle_negation,
-        "$not" => :handle_negation,
         "$nin" => :handle_negation,
-        "$where" => :handle_where,
-        "$regex" => :handle_regexp,
 
-        # these operators do not generate warnings:
-        "$gt" => :empty_handle,
+        # logical
+        "$and" => :empty_handle, #TODO
+        "$nor" => :empty_handle, #TODO
+        "$not" => :empty_handle, #TODO
+        "$or" => :empty_handle, #TODO
+
+        # element
+        "$exists" => :empty_handle, #TODO
+        "$mod" => :empty_handle, #TODO
+        "$type" => :empty_handle, #TODO
+
+        # javascript
+        "$regex" =>  :empty_handle, #TODO
+        "$where" => :empty_handle, #TODO
+
+        # geospatial
+        "$box" => :empty_handle, #TODO
+        "$near" => :empty_handle, #TODO
+        "$within" => :empty_handle, #TODO
+
+        # array
+        "$elemMatch" => :empty_handle, #TODO
+        "$size" => :empty_handle, #TODO
     }
 
     # handles a single operator, e.g.
