@@ -9,6 +9,9 @@ def debug (x)
 end
 
 class EvaluationResult
+    BAD = 1
+    VERY_BAD = 2
+    CRITICAL = 3
     def initialize(msg, severity)
         @msg = msg
         @severity = severity
@@ -18,9 +21,6 @@ end
 
 class Evaluator
     #severity levels:
-    BAD = 1
-    VERY_BAD = 2
-    CRITICAL = 3
 
     def initialize(addr, port)
         @addr = addr
@@ -60,7 +60,7 @@ class Evaluator
         if elems_no > MAX_IN_ARRAY then
             result += [EvaluationResult.new(
                 "$in operator with a large array (#{elems_no}) is inefficient",
-                CRITICAL
+                EvaluationResult::CRITICAL
             )]
         end
         return result
@@ -69,30 +69,35 @@ class Evaluator
     def handle_negation (namespace, field, operator_arg)
         return [EvaluationResult.new(
             'negation operator is inefficient',
-            CRITICAL
+            EvaluationResult::CRITICAL
         )]
     end
 
     def handle_where (namespace, field, operator_arg)
         return [EvaluationResult.new(
             'javascript is slow, you should redesign your queries',
-            CRITICAL
+            EvaluationResult::CRITICAL
         )]
     end
 
+    #TODO
     def handle_regexp(namespace, field, operator_arg)
         return [
             EvaluationResult.new(
                 'REGEX 1',
-                CRITICAL),
+                EvaluationResult::CRITICAL),
             EvaluationResult.new(
                 'REGEX 2',
-                BAD),
+                EvaluationResult::BAD),
         ]
     end
 
     def empty_handle(namespace, field, operator_arg)
         return []
+    end
+
+    #TODO
+    def check_for_indexes query_hash
     end
 
     OPERATOR_HANDLERS_DISPATCH = {
@@ -132,7 +137,7 @@ class Evaluator
         out = []
 
         # TODO
-        #out += check_for_indexes query_hash
+        out += check_for_indexes query_hash
 
         query_hash.each do |field, op|
             out += self.handle_single 'namespace', field, op
