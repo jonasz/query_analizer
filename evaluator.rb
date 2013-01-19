@@ -1,6 +1,13 @@
 require 'rubygems'
 require 'mongo'
 
+#debug purposes
+require 'pp'
+
+def debug (x)
+    PP::pp(x, $>, 50)
+end
+
 class EvaluationResult
     def initialize(msg, severity)
         @msg = msg
@@ -34,40 +41,46 @@ class Evaluator
     # TODO
     def getIndexInformation(namespace)
         coll = getColl(namespace)
-        puts coll.index_information
+        debug coll.index_information
     end
 
     #
     # the operator handlers follow
+    # every handler returns an array of EvaluationResult objects
+    # depending on the following arguments
+    # namespace - specifies the collection
+    # field (self explanatory)
+    # operator_arg - the query arguments, specific to different operators
     #
 
     MAX_IN_ARRAY = 3 #small for testing purposes
-    def handle_in (hash_op)
+    def handle_in (namespace, field, operator_arg)
         result = []
-        if hash_op.count > MAX_IN_ARRAY then
+        elems_no = operator_arg.count
+        if elems_no > MAX_IN_ARRAY then
             result += [EvaluationResult.new(
-                '$in operator with a large array is inefficient',
+                "$in operator with a large array (#{elems_no}) is inefficient",
                 CRITICAL
             )]
         end
         return result
     end
 
-    def handle_negation (hash_op)
+    def handle_negation (namespace, field, operator_arg)
         return [EvaluationResult.new(
             'negation operator is inefficient',
             CRITICAL
         )]
     end
 
-    def handle_where (hash_op)
+    def handle_where (namespace, field, operator_arg)
         return [EvaluationResult.new(
             'javascript is slow, you should redesign your queries',
             CRITICAL
         )]
     end
 
-    def handle_regexp(hash_op)
+    def handle_regexp(namespace, field, operator_arg)
         return [
             EvaluationResult.new(
                 'REGEX 1',
@@ -78,7 +91,7 @@ class Evaluator
         ]
     end
 
-    def empty_handle(hash_op)
+    def empty_handle(namespace, field, operator_arg)
         return []
     end
 
@@ -103,7 +116,7 @@ class Evaluator
 
         operator_hash.each do |operator_str, val|
             method_symbol = OPERATOR_HANDLERS_DISPATCH[operator_str]
-            return self.method( method_symbol ).call val
+            return self.method( method_symbol ).call namespace, field, val
         end
     end
 
@@ -114,10 +127,15 @@ class Evaluator
     #   "B" => {"$in" => [24.0, 25.0]},
     #   "A" => {"$gt" => 27.3}}
     # }
-    def evaluate_query(query_hash)
+    def evaluate_query(query_hash, namespace)
+        debug query_hash
         out = []
+
+        # TODO
+        #out += check_for_indexes query_hash
+
         query_hash.each do |field, op|
-            out += self.handle_single 'dummy_namespace', field, op
+            out += self.handle_single 'namespace', field, op
         end
         return out
     end
