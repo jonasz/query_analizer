@@ -23,6 +23,8 @@ QUERIES = [
     {"A" => {"$in" => [1,2,3,4], "$lt" => 30.0} },
 
     {"A"=> { "$regex"=> "acme.*corp.*$", "$options"=> 'i' } },
+
+    {"A"=> { "$size"=> 20 } },
 ]
 
 e = Evaluator.new 'localhost', 27017

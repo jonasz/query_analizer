@@ -9,8 +9,9 @@ def debug (*xs)
 end
 
 class EvaluationResult
-    BAD = 1
-    VERY_BAD = 2
+    #severity levels:
+    WARNING = 1
+    BAD = 2
     CRITICAL = 3
     def initialize(msg, severity)
         @msg = msg
@@ -20,8 +21,6 @@ class EvaluationResult
 end
 
 class Evaluator
-    #severity levels:
-
     def initialize(addr, port)
         @addr = addr
         @port = port
@@ -76,7 +75,7 @@ class Evaluator
     def handle_where (namespace, field, operator_arg)
         return [
             EvaluationResult.new(
-            'javascript is slow, you should redesign your queries.',
+            'javascript is slow, you should consider redesigning your queries.',
             EvaluationResult::CRITICAL)
         ]
     end
@@ -118,14 +117,14 @@ class Evaluator
                 'Try to change the regex so that it has an anchor for the ' +
                 'beginning (i.e. ^). Otherwise the engine cannot make use of ' +
                 'indexes (if there are any).',
-                EvaluationResult::VERY_BAD)
+                EvaluationResult::BAD)
         end
 
         if regex.casefold? then
             res << EvaluationResult.new(
                 'Case insensitive queries are inefficient. Consider keeping ' +
                 "a lowercase copy of field '#{field}' in your documents.",
-                EvaluationResult::VERY_BAD)
+                EvaluationResult::BAD)
         end
 
         ['.*', '.*$'].each do |bad_end|
@@ -133,11 +132,21 @@ class Evaluator
                 res << EvaluationResult.new(
                     "Do you really need #{bad_end} at the end of your regex? "+
                     'It slows down the queries.',
-                    EvaluationResult::VERY_BAD)
+                    EvaluationResult::BAD)
             end
         end
 
         return res
+    end
+
+    def handle_size(namespace, field, operator_arg)
+        [
+            EvaluationResult.new(
+                'Queries cannot use indexes for $size portion of a query. ' +
+                'Consider keeping a separate field holding the array size ' +
+                'and creating an index on it.',
+                EvaluationResult::WARNING)
+        ]
     end
 
     def empty_handle(namespace, field, operator_arg)
@@ -151,6 +160,8 @@ class Evaluator
 
     OPERATOR_HANDLERS_DISPATCH = {
         "_equality_check" => :empty_handle,
+
+        # http://docs.mongodb.org/manual/reference/operators/
 
         # comparison
         "$all" => :empty_handle, #TODO
@@ -185,7 +196,7 @@ class Evaluator
 
         # array
         "$elemMatch" => :empty_handle, #TODO
-        "$size" => :empty_handle, #TODO
+        "$size" => :handle_size,
     }
 
     # handles operators for a single field, eg
